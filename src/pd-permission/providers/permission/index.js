@@ -21,7 +21,7 @@ module.exports = [function() {
 
 			// register negated role
 			roles['!'+name] = function(toParams, name) {
-				return validator.apply(null, argument)
+				return validator.apply(null, arguments)
 				// Invert result of promise
 				.then($q.reject, $q.resolve)
 			}
@@ -41,9 +41,15 @@ module.exports = [function() {
 				if(!roles[roleName]) {
 					throw new Error('Role ('+roleName+') not defined!');
 				}
-				log.verbose('Authorizing role: '+roleName);
 
 				var promise = $q.when(roles[roleName](toParams, roleName));
+
+				promise = promise.catch(function(reason) {
+					return $q.reject({
+						reason: reason,
+						roleName: roleName
+					});
+				});
 
 				if(resolveCache) {
 					resolveCache[roleName] = promise;
@@ -132,8 +138,12 @@ module.exports = [function() {
 					return self.authorize(roleMap, toParams, resolveCache)
 						.then(function() {
 							return $q.resolve();
-						}, function() {
-							return $q.reject(roleMap);
+						}, function(err) {
+							return $q.reject({
+								roleMap: roleMap,
+								reason: err && err.reason,
+								roleName: err && err.roleName
+							});
 						})
 					});
 			});

@@ -96,7 +96,9 @@ module.exports = ['$rootScope', 'Permission', '$state', '$q', function ($rootSco
 						});
 					}
 				})
-				.catch(function(permission) {
+				.catch(function(err) {
+
+					var permission = err.roleMap;
 
 					if (!$rootScope.$broadcast('$stateChangeStart', toState, toParams, fromState, fromParams).defaultPrevented) {
 						$rootScope.$broadcast('$stateChangePermissionDenied', toState, toParams);
@@ -105,7 +107,7 @@ module.exports = ['$rootScope', 'Permission', '$state', '$q', function ($rootSco
 
 							// if redirectTo is a function
 							if( angular.isFunction(permission.redirectTo) ) {
-								$q.when( permission.redirectTo() )
+								$q.when( permission.redirectTo(err.reason) )
 								.then(function(newState) {
 									// If the function returns a state then go to it
 									if(newState) {
@@ -116,6 +118,31 @@ module.exports = ['$rootScope', 'Permission', '$state', '$q', function ($rootSco
 							// if redirectTo is a string expect it is a state name and go to it
 							} else if( angular.isString(permission.redirectTo) ) {
 								$state.go(permission.redirectTo, toParams);
+
+
+							// if redirectTo is an object of roleNames
+							} else if( angular.isObject(permission.redirectTo) ) {
+
+								if(permission.redirectTo[err.roleName]) {
+
+									var handle = permission.redirectTo[err.roleName];
+
+									// if handle is a string, then suppose that it is a routeName
+									if( angular.isString(handle) ) {
+										$state.go(handle, toParams);
+
+									// if handle is a function - invoke it
+									} else if( angular.isFunction(handle) ) {
+										$q.when( handle(err.reason) )
+											.then(function(res) {
+
+												// if res is a string suppose that it is a routeName
+												if( angular.isString(res)) {
+													$state.go(res, toParams);
+												}
+											});
+									}
+								}
 							}
 
 						}
